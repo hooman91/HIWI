@@ -32,14 +32,14 @@ void switch_pcie::npu_process(){
 			trans.set_data_ptr((unsigned char*) &header);
 			delay = SC_ZERO_TIME;
 			phase = BEGIN_REQ;
-			i_socket[index]->nb_transport_fw(trans, phase, delay);
+			i_socket_0->nb_transport_fw(trans, phase, delay);
 			pending_transaction[index] = true;
 			wait(receive_event);
 			trans.set_command(TLM_WRITE_COMMAND);
 			trans.set_response_status(TLM_GENERIC_ERROR_RESPONSE);
 			delay = SC_ZERO_TIME;
 			phase = BEGIN_REQ;
-			i_socket[rand()%n_ports]->nb_transport_fw(trans, phase, delay);//for now random destination is chosen. it will be replace with routing funct
+			i_socket_0->nb_transport_fw(trans, phase, delay);//for now random destination is chosen. it will be replace with routing funct
 			wait(receive_event);
 		}
 

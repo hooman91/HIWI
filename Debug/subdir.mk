@@ -10,7 +10,8 @@ CPP_SRCS += \
 ../port.cpp \
 ../root_complex.cpp \
 ../root_complex_simple.cpp \
-../switch.cpp 
+../switch.cpp \
+../tlp_messages.cpp 
 
 OBJS += \
 ./completer.o \
@@ -19,7 +20,8 @@ OBJS += \
 ./port.o \
 ./root_complex.o \
 ./root_complex_simple.o \
-./switch.o 
+./switch.o \
+./tlp_messages.o 
 
 CPP_DEPS += \
 ./completer.d \
@@ -28,7 +30,8 @@ CPP_DEPS += \
 ./port.d \
 ./root_complex.d \
 ./root_complex_simple.d \
-./switch.d 
+./switch.d \
+./tlp_messages.d 
 
 
 # Each subdirectory must supply rules for building sources it contributes

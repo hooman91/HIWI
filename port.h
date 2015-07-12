@@ -75,11 +75,18 @@ public:
 		port_arbitration_result = new int[n_vc];
 		vc_arbitration_result = 0;
 		pending_transaction = false;
-		//port_arbiter_fifo = new sc_fifo<tlp_header>[n_vc][n_port];
-		for(int i=0; i<n_vc; i++){
+//		port_arbiter_fifo = new sc_fifo<tlp_header>[n_vc][n_port];
+//		for(int i=0; i<4; i++){
+//			for(int j=0;j<4-1;j++)
+//				port_arbiter_fifo[i][j] = new sc_fifo<tlp_header>(20);
+//		}
+		port_arbiter_fifo = new sc_fifo<tlp_header>**[n_vc];
+		for(int i=0; i<n_vc; i++)	port_arbiter_fifo[i] = new sc_fifo<tlp_header>*[n_port];
+
+		for(int i=0; i<n_vc; i++)
 			for(int j=0;j<n_port-1;j++)
 				port_arbiter_fifo[i][j] = new sc_fifo<tlp_header>(20);
-		}
+
 
 		SC_THREAD(mapping_process);
 		sensitive<<packet_from_switch;

@@ -8,7 +8,7 @@
 #ifndef TLP_MESSAGES_H_
 #define TLP_MESSAGES_H_
 
-
+#include "iostream"
 struct DW0{
 	char Fmt;
 	char R;
@@ -39,19 +39,16 @@ struct tlp_header{
 	DW1 dw1;
 	DW2 dw2;
 	DW3 dw3;
+	friend std::ostream& operator<<(std::ostream & Str, tlp_header const & v);
+
 };
 // NPU sends this type of header to output ports
 struct npu_header{
 	tlp_header* header;
 	int port;
+	friend std::ostream& operator<<(std::ostream & Str, npu_header const & v);
 };
 
-std::ostream & operator<<(std::ostream & Str, tlp_header const & v) {
-  Str << "tlp_header";
-  return Str;
-}
-std::ostream & operator<<(std::ostream & Str, npu_header const & v) {
-  Str << "npu_header";
-  return Str;
-}
+
+
 #endif /* TLP_MESSAGES_H_ */

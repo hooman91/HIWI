@@ -55,7 +55,8 @@ void endpoint::send_trigger(){
 	while(true){
 		wait(request_rate, SC_NS);
 		send_event.notify();
-//		cout<<endl<<"event:send_event"<<endl;
+
+		cout<<endl<<"event:send_event"<<endl;
 	}
 }
 
