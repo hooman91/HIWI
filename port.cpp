@@ -40,7 +40,7 @@ void port_pcie::vc_arbiter(){
 	int j=0;
 	for(int i=0;i<n_vc;i++){
 		if(port_arbitration_result[i] == -1){
-			cout<<endl<<"no more packets"<<endl;
+			//cout<<endl<<"no more packets"<<endl;
 			vc_arbitration_result = -1;
 			return;
 		}
@@ -56,10 +56,18 @@ void port_pcie::vc_arbiter(){
 void port_pcie::mapping_process(){
 	while(true){
 		wait();
-		npu_header* header;
-		from_switch_fifo.nb_read(*header);
-		int vc = tc_vc_mapper(header->header->dw0.TC);
-		port_arbiter_fifo[vc][header->port]->write(*(header->header));
+		npu_header header;
+		from_switch_fifo.nb_read(header);
+		cout<<endl<<"map:"<< header.port<<endl;
+		int vc = tc_vc_mapper(header.dw0.TC);
+		port_arbiter_fifo[vc][header.port]->nb_write((tlp_header) header);
+		cout<<"available:"<<port_arbiter_fifo[vc][header.port]->num_available()<<endl;
+		for (int i=0;i<n_vc;i++)	{port_arbiter(i);	cout<<port_arbitration_result[i]<<endl;}
+
+		vc_arbiter();
+		cout<<vc_arbitration_result<<endl;
+		if(vc_arbitration_result != -1)
+			transmit_event.notify();
 		//port_arbiter(vc);
 	}
 }
@@ -70,11 +78,14 @@ void port_pcie::transmit_process(){
 	sc_time delay;
 	tlm_phase phase;
 	tlp_header header;
+	pending_transaction = false;
 	while(true){
-		if(pending_transaction==true)	wait();   ///not sure about it
+		if(pending_transaction==true){
+			wait(send_event);
+			pending_transaction = false;
+		}
 		else{
-			for (int i=0;i<n_vc;i++)	port_arbiter(i);
-			do	vc_arbiter();	while(vc_arbitration_result==-1);
+			wait(transmit_event);
 			trans.set_command(TLM_WRITE_COMMAND);
 			trans.set_data_ptr((unsigned char*) &port_arbiter_fifo[vc_arbitration_result][port_arbitration_result[vc_arbitration_result]]);
 			trans.set_response_status(TLM_GENERIC_ERROR_RESPONSE);
@@ -93,7 +104,7 @@ tlm_sync_enum port_pcie::nb_transport_bw_outside(tlm_generic_payload& payload, t
 		cout<<endl<<sc_time_stamp()<<" producer: write confirmation coming" << endl;
 	else
 		cout<<endl<<sc_time_stamp()<<" producer: write not correctly confirmed" << endl;
-	pending_transaction = false;
+	send_event.notify();
 	// finish the transaction (end of 2nd phase)
 	phase = END_RESP;
 	return TLM_COMPLETED;
@@ -105,13 +116,16 @@ tlm_sync_enum port_pcie::nb_transport_fw_switch(tlm_generic_payload& payload, tl
 	}
 //	npu_header* header;
 //	header = (npu_header*) payload.get_data_ptr();
+//	cout<<endl<<"port"<<this->port_index<<":	got command from switch"<<endl;
 	if(payload.get_command()==TLM_READ_COMMAND){
 //		to_switch_fifo.nb_read(*header);
+		cout<<endl<<"port"<<this->port_index<<":	got read command from switch"<<endl;
 		switch_read_peq.notify(payload, sc_time(10, SC_NS));
 		payload.set_response_status(TLM_OK_RESPONSE);
 	}
 	else if(payload.get_command()==TLM_WRITE_COMMAND){
 //		from_switch_fifo.nb_write(*header);
+		cout<<endl<<"port"<<this->port_index<<":	got write command from switch"<<endl;
 		switch_write_peq.notify(payload, sc_time(10, SC_NS));
 		payload.set_response_status(TLM_OK_RESPONSE);
 	}
@@ -133,8 +147,10 @@ tlm_sync_enum port_pcie::nb_transport_fw_outside(tlm_generic_payload& payload, t
 void port_pcie::not_empty_process(){
 	while(true){
 		wait();
-		if(to_switch_fifo.num_available()>0)
+		if(to_switch_fifo.num_available()>0){
 			not_empty_interrupt=1;
+			cout<<endl<<"port"<<this->port_index<<":	interrupt_active";
+		}
 		else
 			not_empty_interrupt=0;
 	}
@@ -145,12 +161,15 @@ void port_pcie::switch_read(){
 	sc_time delay;
 	tlm_phase phase;
 	tlm_generic_payload *payload;
+	npu_header* header;
 	while(true){
 		wait();
 		payload = switch_read_peq.get_next_transaction();
-		npu_header* header;
+
+
+		//payload->set_data_ptr((unsigned char*) &header);
+		payload->get_extension(header);
 		to_switch_fifo.nb_read(*header);
-		payload->set_data_ptr((unsigned char*) header);
 		phase = BEGIN_RESP;
 		delay = sc_time(10, SC_NS);
 		// call nb_transport_bw
@@ -168,17 +187,18 @@ void port_pcie::switch_write(){
 	sc_time delay;
 	tlm_phase phase;
 	tlm_generic_payload *payload;
+	npu_header *header;
 	while(true){
 		wait();
-		npu_header* header;
-		payload = switch_read_peq.get_next_transaction();
-		header = (npu_header*) payload->get_data_ptr();
+		payload = switch_write_peq.get_next_transaction();
+		payload->get_extension(header);
 		from_switch_fifo.nb_write(*header);
 		phase = BEGIN_RESP;
 		delay = SC_ZERO_TIME;
 		// call nb_transport_bw
 		tlm_resp = t_socket_to_switch->nb_transport_bw(*payload, phase, delay);
 		packet_from_switch.notify();
+		cout<<endl<<"port"<<this->port_index<<":	got packet from switch"<<endl;
 		if(tlm_resp != TLM_COMPLETED || phase != END_RESP)
 		{
 			cout<<endl<<sc_time_stamp()<<" fifo: write response not appropriately completed" << endl;
@@ -191,13 +211,17 @@ void port_pcie::outside_write(){
 	sc_time delay;
 	tlm_phase phase;
 	tlm_generic_payload *payload;
+	tlp_header* header_t;
+	npu_header* header_n;
 	while(true){
 		wait();
-		npu_header* header;
 		payload = outside_write_peq.get_next_transaction();
-		header->header = (tlp_header*) payload->get_data_ptr();
-		header->port = this->port_index;
-		to_switch_fifo.nb_write(*header);
+		payload->get_extension(header_t);
+		header_n = (npu_header*) header_t;
+		cout<<endl<<this->port_index<<endl;
+		//cout<<endl<<header->port<<endl;
+		header_n->port = this->port_index;
+		to_switch_fifo.nb_write(*header_n);
 		packet_outside.notify();
 		phase = BEGIN_RESP;
 		delay = SC_ZERO_TIME;

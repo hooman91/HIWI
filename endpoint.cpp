@@ -15,8 +15,7 @@ void endpoint::send_procedure(){
 	tlm_response_status tlm_stat;
 	sc_time delay;
 	tlm_phase phase;
-	tlp_header header;
-
+	tlp_header* header= new tlp_header();
 
 
 	bool pending_transaction = false;
@@ -25,22 +24,26 @@ void endpoint::send_procedure(){
 		if(pending_transaction){
 			wait(response_event);
 			pending_transaction = false;
+			trans.clear_extension(header);
 
 		}
 		wait(send_event);
 		//generate tlp header
 		//send packet calling fw function
 		//check the result
-		header.dw0.Length= (short) rand()%128;//????
+		header->dw0.Length= (short) rand()%128;//????
 		trans.set_command(TLM_WRITE_COMMAND);
-		trans.set_data_length(header.dw0.Length);
-		trans.set_data_ptr((unsigned char*) &header); //I am not sure if this is gonna work! :D
+		trans.set_data_length(header->dw0.Length);
+//		trans.set_data_ptr((unsigned char*) &header); //I am not sure if this is gonna work! :D
 		trans.set_response_status(TLM_GENERIC_ERROR_RESPONSE);
-
+		trans.set_extension(header);
 		delay = SC_ZERO_TIME;
 		phase = BEGIN_REQ;
 
 		tlm_resp = i_socket->nb_transport_fw(trans, phase, delay);
+
+
+
 		pending_transaction = true;
 		if(tlm_resp != TLM_UPDATED || phase != END_REQ)
 		{
@@ -55,7 +58,6 @@ void endpoint::send_trigger(){
 	while(true){
 		wait(request_rate, SC_NS);
 		send_event.notify();
-
 		cout<<endl<<"event:send_event"<<endl;
 	}
 }
@@ -86,7 +88,7 @@ tlm_sync_enum endpoint::nb_transport_fw( tlm_generic_payload  &payload, tlm_phas
 
 tlm_sync_enum endpoint::nb_transport_bw( tlm_generic_payload  &payload, tlm_phase	&phase, sc_time	&delay_time){
 	if(phase == BEGIN_RESP)
-		cout<<endl<<sc_time_stamp()<<" producer: write confirmation coming" << endl;
+		cout<<endl<<sc_time_stamp()<<"   end-point"<<this->ID<<": write confirmation coming" << endl;
 	else
 		cout<<endl<<sc_time_stamp()<<" producer: write not correctly confirmed" << endl;
 

@@ -44,6 +44,8 @@ private:
 	sc_fifo<npu_header> to_switch_fifo;
 	sc_event packet_from_switch;
 	sc_event packet_outside;
+	sc_event send_event;
+	sc_event transmit_event;
 //	sc_event switch_read_cmd;
 //	sc_event switch_write_cmd;
 	peq_with_get<tlm_generic_payload> switch_read_peq;
@@ -97,6 +99,8 @@ public:
 		sensitive<<switch_write_peq.get_event();
 		SC_THREAD(outside_write);
 		sensitive<<outside_write_peq.get_event();
+		SC_THREAD(not_empty_process);
+		sensitive<<packet_outside;
 
 		i_socket_to_outside.register_nb_transport_bw(this, &port_pcie::nb_transport_bw_outside);
 		t_socket_to_switch.register_nb_transport_fw(this, &port_pcie::nb_transport_fw_switch);

@@ -9,6 +9,8 @@
 #define TLP_MESSAGES_H_
 
 #include "iostream"
+#include "systemc.h"
+#include "tlm.h"
 struct DW0{
 	char Fmt;
 	char R;
@@ -33,8 +35,11 @@ struct DW3{
 	int Address;
 };
 
-struct tlp_header{
+struct tlp_header: tlm::tlm_extension<tlp_header>{
 
+	tlp_header(){};
+	tlm_extension_base* clone() const {return 0;}
+	virtual void copy_from(tlm_extension_base const &ext) {}
 	DW0 dw0;
 	DW1 dw1;
 	DW2 dw2;
@@ -43,8 +48,7 @@ struct tlp_header{
 
 };
 // NPU sends this type of header to output ports
-struct npu_header{
-	tlp_header* header;
+struct npu_header: tlp_header{
 	int port;
 	friend std::ostream& operator<<(std::ostream & Str, npu_header const & v);
 };
